@@ -427,10 +427,10 @@ def admin_login():
 def admin_dashboard():
     db = get_db()
     stats = {
-        "courses": db.execute("SELECT COUNT(*) FROM courses").fetchone()[0],
-        "lessons": db.execute("SELECT COUNT(*) FROM lessons").fetchone()[0],
-        "students": db.execute("SELECT COUNT(*) FROM users WHERE role='student'").fetchone()[0],
-        "feedback": db.execute("SELECT COUNT(*) FROM feedback").fetchone()[0],
+        "courses": db.execute("SELECT COUNT(*) AS count FROM courses").fetchone()["count"],
+        "lessons": db.execute("SELECT COUNT(*) AS count FROM lessons").fetchone()["count"],
+        "students": db.execute("SELECT COUNT(*) AS count FROM users WHERE role='student'").fetchone()["count"],
+        "feedback": db.execute("SELECT COUNT(*) AS count FROM feedback").fetchone()["count"],
     }
     courses = db.execute("SELECT * FROM courses ORDER BY id DESC").fetchall()
     return render_template("admin.html", stats=stats, courses=courses)
@@ -529,7 +529,7 @@ def admin_lessons(course_id, lesson_id=None):
                            (title,body,tips,notes,assignment,video_value,lesson_id))
                 flash("Lesson updated successfully.", "success")
             else:
-                order = db.execute("SELECT COALESCE(MAX(sort_order),0)+1 FROM lessons WHERE course_id=?", (course_id,)).fetchone()[0]
+                order = db.execute("SELECT COALESCE(MAX(sort_order),0)+1 AS next_order FROM lessons WHERE course_id=?", (course_id,)).fetchone()["next_order"]
                 db.execute("INSERT INTO lessons(course_id,title,body,tips,notes,assignment,video_url,sort_order) VALUES(?,?,?,?,?,?,?,?)",
                            (course_id,title,body,tips,notes,assignment,video_value,order))
                 flash("Lesson added. Give learners a task they can finish today!", "success")
