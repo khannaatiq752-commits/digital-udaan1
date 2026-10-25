@@ -54,10 +54,33 @@ if not DATABASE_URL:
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 def store_upload(upload, filename, resource_type="image"):
-    if cloudinary and os.getenv("CLOUDINARY_URL"):
-        result = cloudinary.uploader.upload(upload, folder="digital-udaan", resource_type=resource_type, public_id=Path(filename).stem, overwrite=True)
-        return result["secure_url"]
-    upload.save(UPLOAD_FOLDER / filename)
+    cloudinary_url = os.getenv("CLOUDINARY_URL", "").strip()
+    if cloudinary_url:
+        if cloudinary is None:
+            raise RuntimeError("Cloudinary package is not installed; redeploy after installing requirements.txt.")
+        try:
+            result = cloudinary.uploader.upload(
+                upload,
+                folder="digital-udaan",
+                resource_type=resource_type,
+                public_id=Path(filename).stem,
+                overwrite=True,
+                timeout=30,
+            )
+            secure_url = result.get("secure_url")
+            if not secure_url or not secure_url.startswith("https://"):
+                raise RuntimeError("Cloudinary upload did not return a secure image URL.")
+            app.logger.info("Upload saved to Cloudinary: %s", result.get("public_id", Path(filename).stem))
+            return secure_url
+        except Exception:
+            app.logger.exception("Cloudinary upload failed for %s", filename)
+            raise
+
+    # Local uploads are only for local development. Render's filesystem is temporary.
+    if os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID"):
+        raise RuntimeError("Cloudinary is not configured on Render. Set CLOUDINARY_URL in Render Environment.")
+    destination = UPLOAD_FOLDER / filename
+    upload.save(destination)
     return "/static/uploads/" + filename
 
 COURSE_SEEDS = [
@@ -457,7 +480,12 @@ def admin_course_form(course_id=None):
                 flash("Thumbnail must be PNG, JPG, WEBP or GIF.", "error")
                 return render_template("admin_course_form.html", course=course)
             filename = f"course-{uuid.uuid4().hex}.{ext}"
-            thumbnail = store_upload(image, filename)
+            try:
+                thumbnail = store_upload(image, filename)
+            except Exception:
+                app.logger.exception("Failed to save course thumbnail")
+                flash("Thumbnail upload failed. Check Cloudinary settings in Render logs.", "error")
+                return render_template("admin_course_form.html", course=course)
         if len(title) < 3 or len(description) < 10 or not category:
             flash("Title, description (10+ characters) and category are required.", "error")
         else:
@@ -514,7 +542,12 @@ def admin_lessons(course_id, lesson_id=None):
                 flash("Video must be MP4 or WEBM.", "error")
                 return redirect(request.url)
             filename = f"lesson-{uuid.uuid4().hex}.{ext}"
-            video_path = store_upload(upload, filename, resource_type="video")
+            try:
+                video_path = store_upload(upload, filename, resource_type="video")
+            except Exception:
+                app.logger.exception("Failed to save lesson video")
+                flash("Video upload failed. Check Cloudinary settings in Render logs.", "error")
+                return redirect(request.url)
         try:
             video_url = safe_video_url(video_url) if video_url else ""
         except ValueError as exc:
@@ -568,7 +601,12 @@ def admin_settings():
                     flash(f"{field.title()} file type is not supported.", "error")
                     return redirect(url_for("admin_settings"))
                 filename = f"{field}-{uuid.uuid4().hex}.{ext}"
-                stored_path = store_upload(upload, filename)
+                try:
+                    stored_path = store_upload(upload, filename)
+                except Exception:
+                    app.logger.exception("Failed to save %s upload", field)
+                    flash(f"{field.title()} upload failed. Check the Render logs and Cloudinary settings; the previous saved value was kept.", "error")
+                    return redirect(url_for("admin_settings"))
                 db.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (setting_key, stored_path))
         db.commit()
         flash("Brand settings saved. Refresh the site to see the changes.", "success")
