@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Feedback inbox{% endblock %}
+{% block content %}
+<section class="admin-header"><div><span class="eyebrow">WORKSPACE / ADMIN</span><h1>Feedback inbox.</h1><p>Messages submitted through the contact form.</p></div><div class="admin-actions"><a class="button button-outline" href="{{ url_for('admin_dashboard') }}">Back to dashboard</a></div></section>
+<section class="section admin-section">
+{% if messages %}
+<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Date</th><th>Name</th><th>Email</th><th>Message</th></tr></thead><tbody>
+{% for item in messages %}<tr><td>{{ item.created_at }}</td><td>{{ item.name }}</td><td>{{ item.email }}</td><td style="white-space:pre-wrap; min-width:240px">{{ item.message }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<div class="tip-panel"><h2>No feedback yet</h2><p>New contact-form messages will appear here.</p></div>{% endif %}
+</section>
+{% endblock %}
