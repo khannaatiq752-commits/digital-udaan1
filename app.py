@@ -517,13 +517,6 @@ def admin_settings():
             value = request.form.get(key, "").strip()[:1000]
             if value:
                 db.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key,value))
-        hero_image_url = request.form.get("hero_image_url", "").strip()
-        if hero_image_url:
-            parsed_hero_url = urlparse(hero_image_url)
-            if parsed_hero_url.scheme != "https" or parsed_hero_url.netloc != "res.cloudinary.com":
-                flash("Hero image URL must be a valid HTTPS Cloudinary URL.", "error")
-                return redirect(url_for("admin_settings"))
-            db.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", ("hero_image", hero_image_url))
         for field, setting_key, allowed in (("logo", "logo_path", ALLOWED_IMAGE), ("favicon", "favicon_path", ALLOWED_FAVICON), ("hero_image", "hero_image", ALLOWED_IMAGE)):
             upload = request.files.get(field)
             if upload and upload.filename:
