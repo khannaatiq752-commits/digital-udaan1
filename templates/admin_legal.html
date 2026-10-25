@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Privacy & Terms{% endblock %}
+{% block content %}
+<section class="admin-header"><div><span class="eyebrow">WORKSPACE / ADMIN</span><h1>Legal pages.</h1><p>Edit the content shown on the public Privacy Policy and Terms &amp; Conditions pages.</p></div><div class="admin-actions"><a class="button button-outline" href="{{ url_for('admin_dashboard') }}">Back to dashboard</a></div></section>
+<section class="section form-page wide-form">
+<form method="post" class="stack-form form-card">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<h2>Privacy Policy</h2>
+<label for="privacy_title">Page title</label><input id="privacy_title" name="privacy_title" value="{{ privacy_title }}" maxlength="200" required>
+<label for="privacy_body">Policy content</label><textarea id="privacy_body" name="privacy_body" rows="12" maxlength="30000" required>{{ privacy_body }}</textarea>
+<h2>Terms &amp; Conditions</h2>
+<label for="terms_title">Page title</label><input id="terms_title" name="terms_title" value="{{ terms_title }}" maxlength="200" required>
+<label for="terms_body">Terms content</label><textarea id="terms_body" name="terms_body" rows="12" maxlength="30000" required>{{ terms_body }}</textarea>
+<button class="button" type="submit">Save legal pages</button>
+<p class="tip-panel">After saving, open the public Privacy Policy and Terms &amp; Conditions links in the footer to check the updated text. Have the wording reviewed before launch.</p>
+</form></section>
+{% endblock %}
