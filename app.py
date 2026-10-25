@@ -595,11 +595,58 @@ def about():
 
 @app.route("/privacy")
 def privacy():
-    return render_template("simple_page.html", title="Privacy", body="This starter privacy page must be reviewed and customized before public launch. Collect only necessary data, protect it, and explain retention and user rights clearly.")
+    return render_template(
+        "simple_page.html",
+        title=get_setting("privacy_title", "Privacy Policy"),
+        body=get_setting("privacy_body", "This privacy policy should be reviewed and customized by the site owner before public launch.")
+    )
 
 @app.route("/terms")
 def terms():
-    return render_template("simple_page.html", title="Terms", body="This starter terms page is a placeholder for a reviewed policy. Customize it for your service and jurisdiction before public launch.")
+    return render_template(
+        "simple_page.html",
+        title=get_setting("terms_title", "Terms & Conditions"),
+        body=get_setting("terms_body", "These terms and conditions should be reviewed and customized by the site owner before public launch.")
+    )
+
+@app.route("/admin/feedback")
+@admin_required
+def admin_feedback():
+    messages = get_db().execute(
+        "SELECT id, name, email, message, created_at FROM feedback ORDER BY id DESC"
+    ).fetchall()
+    return render_template("admin_feedback.html", messages=messages)
+
+@app.route("/admin/legal", methods=["GET", "POST"])
+@admin_required
+def admin_legal():
+    db = get_db()
+    defaults = {
+        "privacy_title": "Privacy Policy",
+        "privacy_body": "Add your privacy policy here.",
+        "terms_title": "Terms & Conditions",
+        "terms_body": "Add your terms and conditions here.",
+    }
+    if request.method == "POST":
+        values = {key: request.form.get(key, "").strip() for key in defaults}
+        if any(not value for value in values.values()):
+            flash("Please fill in all four fields.", "error")
+        elif any(len(value) > 30000 for value in values.values()):
+            flash("Policy text is too long (maximum 30,000 characters per field).", "error")
+        else:
+            for key, value in values.items():
+                db.execute(
+                    "INSERT INTO settings(key, value) VALUES(?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (key, value),
+                )
+            db.commit()
+            flash("Privacy Policy and Terms & Conditions saved.", "success")
+            return redirect(url_for("admin_legal"))
+    values = {key: get_setting(key, default) for key, default in defaults.items()}
+    if request.method == "POST" and any(not request.form.get(key, "").strip() for key in defaults):
+        values = {key: request.form.get(key, "") for key in defaults}
+    return render_template("admin_legal.html", **values)
 
 @app.errorhandler(403)
 def forbidden(_error):
