@@ -13,6 +13,12 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
+try:
+    import cloudinary
+    import cloudinary.uploader
+except ImportError:
+    cloudinary = None
+
 load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE = Path(os.getenv("DATABASE_PATH", "instance/digital_udaan.sqlite3"))
@@ -37,6 +43,13 @@ app.config.update(
 CSRFProtect(app)
 DATABASE.parent.mkdir(parents=True, exist_ok=True)
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+
+def store_upload(upload, filename, resource_type="image"):
+    if cloudinary and os.getenv("CLOUDINARY_URL"):
+        result = cloudinary.uploader.upload(upload, folder="digital-udaan", resource_type=resource_type, public_id=Path(filename).stem, overwrite=True)
+        return result["secure_url"]
+    upload.save(UPLOAD_FOLDER / filename)
+    return "/static/uploads/" + filename
 
 COURSE_SEEDS = [
     ("Digital Marketing Foundations", "Build a clear digital marketing plan for a small business.", "Strategy", "Beginner", 90, "Learn the channels, customer journey and a simple weekly plan.", "chart"),
@@ -401,8 +414,7 @@ def admin_course_form(course_id=None):
                 flash("Thumbnail must be PNG, JPG, WEBP or GIF.", "error")
                 return render_template("admin_course_form.html", course=course)
             filename = f"course-{uuid.uuid4().hex}.{ext}"
-            image.save(UPLOAD_FOLDER / filename)
-            thumbnail = "/static/uploads/" + filename
+            thumbnail = store_upload(image, filename)
         if len(title) < 3 or len(description) < 10 or not category:
             flash("Title, description (10+ characters) and category are required.", "error")
         else:
@@ -459,8 +471,7 @@ def admin_lessons(course_id, lesson_id=None):
                 flash("Video must be MP4 or WEBM.", "error")
                 return redirect(request.url)
             filename = f"lesson-{uuid.uuid4().hex}.{ext}"
-            upload.save(UPLOAD_FOLDER / filename)
-            video_path = "/static/uploads/" + filename
+            video_path = store_upload(upload, filename, resource_type="video")
         try:
             video_url = safe_video_url(video_url) if video_url else ""
         except ValueError as exc:
@@ -514,8 +525,8 @@ def admin_settings():
                     flash(f"{field.title()} file type is not supported.", "error")
                     return redirect(url_for("admin_settings"))
                 filename = f"{field}-{uuid.uuid4().hex}.{ext}"
-                upload.save(UPLOAD_FOLDER / filename)
-                db.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (setting_key, "/static/uploads/" + filename))
+                stored_path = store_upload(upload, filename)
+                db.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (setting_key, stored_path))
         db.commit()
         flash("Brand settings saved. Refresh the site to see the changes.", "success")
         return redirect(url_for("admin_settings"))
